@@ -1,0 +1,87 @@
+/* Neumorphic skin over the Tailwind markup. Selectors start with `html body` so they
+   outrank Tailwind's single-class utilities regardless of load order. */
+:root{
+  --bg:#e4e9f0; --ink:#26304a; --muted:#5f6a82; --line:#cdd5e0;
+  --hi:#ffffff; --lo:#b6bfcd;
+  --accent:#2350b0; --accent-ink:#ffffff; --accent-soft:#d6e0f4;
+  --good:#0d7040; --warn:#8a5200; --bad:#b42318;
+  --raise:7px 7px 16px var(--lo),-7px -7px 16px var(--hi);
+  --raise-sm:4px 4px 9px var(--lo),-4px -4px 9px var(--hi);
+  --inset:inset 3px 3px 7px var(--lo),inset -3px -3px 7px var(--hi);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#252c3a; --ink:#e1e7f2; --muted:#9ba6bc; --line:#343d50; --hi:#2f384a; --lo:#191e29;
+  --accent:#86a8f6; --accent-ink:#121a2e; --accent-soft:#2c3958; --good:#66d6a0; --warn:#f2b75e; --bad:#ff8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#252c3a; --ink:#e1e7f2; --muted:#9ba6bc; --line:#343d50; --hi:#2f384a; --lo:#191e29;
+  --accent:#86a8f6; --accent-ink:#121a2e; --accent-soft:#2c3958; --good:#66d6a0; --warn:#f2b75e; --bad:#ff8a80; color-scheme:dark}
+
+html body,html body.bg-slate-100{background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+html body h1,html body h2{font-family:"Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.01em}
+html body h1{font-size:30px;font-weight:700}
+html body h2{font-size:20px}
+html body .plate{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+
+/* Text colors follow the theme */
+html body .text-slate-900,html body .text-slate-800,html body .text-slate-700,html body .text-slate-600{color:var(--ink)}
+html body .text-slate-500,html body .text-slate-400,html body .text-slate-300{color:var(--muted)}
+html body .text-sky-700{color:var(--accent)}
+html body .text-red-600{color:var(--bad)}
+html body .text-emerald-600,html body .text-emerald-700{color:var(--good)}
+html body .text-amber-600{color:var(--warn)}
+
+/* Header + tabs */
+html body header.bg-slate-900{background:var(--bg);color:var(--ink);padding-top:env(safe-area-inset-top,0px)}
+html body header span.rounded{background:var(--bg);box-shadow:var(--inset);color:var(--accent);border-radius:999px;padding:6px 12px}
+html body header nav{gap:6px;padding:6px;margin-top:6px;margin-bottom:10px;border-radius:16px;box-shadow:var(--inset);max-width:calc(80rem - 2rem);scrollbar-width:none}
+html body header nav::-webkit-scrollbar{display:none}
+html body header nav button{border-radius:12px;color:var(--muted);background:transparent}
+html body header nav button.bg-slate-100{background:var(--bg);color:var(--accent);box-shadow:var(--raise-sm)}
+@media (min-width:768px){html body header nav{margin-left:auto;margin-right:auto;width:calc(100% - 2rem)}}
+
+/* Surfaces */
+html body .bg-white{background:var(--bg);border-radius:24px;box-shadow:var(--raise)}
+html body .shadow-sm{--tw-shadow:0 0 #0000}
+html body .bg-slate-50,html body .bg-slate-100,html body .bg-amber-50,html body .bg-sky-50{background:var(--bg);box-shadow:var(--inset)}
+html body thead.bg-slate-50{box-shadow:none}
+html body .divide-y>*+*{border-color:var(--line)}
+html body .border-slate-200{border-color:var(--line)}
+html body .border-dashed{border-color:var(--lo);border-radius:20px;box-shadow:var(--inset)}
+
+/* Fields */
+html body input:not([type=checkbox]):not([type=range]):not([type=file]),html body select,html body textarea{
+  background:var(--bg);color:var(--ink);border:0;border-radius:12px;box-shadow:var(--inset);min-height:42px}
+html body input[type=range]{accent-color:var(--accent)}
+html body input::placeholder,html body textarea::placeholder{color:var(--muted);opacity:.7}
+html body input:focus,html body select:focus,html body textarea:focus{outline:2px solid var(--accent);outline-offset:2px;--tw-ring-shadow:0 0 #0000}
+
+/* Buttons and button-like links */
+html body button.rounded,html body a.rounded,html body button.border,html body a.border{
+  background:var(--bg);color:var(--ink);border:0;border-radius:12px;box-shadow:var(--raise-sm);min-height:40px}
+html body .bg-sky-600,html body .bg-slate-800,html body .bg-slate-900:not(header),html body .bg-emerald-600{
+  background:var(--accent)!important;color:var(--accent-ink)!important;box-shadow:4px 4px 10px var(--lo),-4px -4px 10px var(--hi)}
+html body header .bg-white,html body header .bg-slate-700{background:var(--bg);color:var(--ink);box-shadow:var(--raise-sm);border-radius:12px}
+html body button:active,html body a.rounded:active{box-shadow:var(--inset)}
+html body button:focus-visible,html body a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+html body button:disabled{opacity:.45;box-shadow:none}
+
+/* Toast */
+html body .fixed.bottom-4{border-radius:999px;bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+
+/* Phones: 16px fields (no iOS zoom), tables become stacked cards */
+@media (max-width:700px){
+  html body input:not([type=checkbox]):not([type=range]):not([type=file]),html body select,html body textarea{font-size:16px}
+  html body main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  html body .w-32,html body .w-40{width:100%}
+  html body section .flex-wrap>div{flex:1 1 140px}
+  html body div.overflow-x-auto{overflow:visible;box-shadow:none;background:transparent}
+  html body header nav{margin-left:16px;margin-right:16px}
+  html body .grid.sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  html body .grid.sm\:grid-cols-2>.bg-white{padding:12px 14px;border-radius:18px}
+  html body table.stack-sm,html body table.stack-sm tbody,html body table.stack-sm tr,html body table.stack-sm td{display:block;width:100%}
+  html body table.stack-sm thead{display:none}
+  html body table.stack-sm tr{margin:0 0 16px;padding:10px 4px;border-radius:20px;box-shadow:var(--raise-sm);background:var(--bg)}
+  html body table.stack-sm td{padding:6px 14px;max-width:none;white-space:normal}
+  html body table.stack-sm td[data-label]::before{content:attr(data-label);display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;margin-bottom:2px}
+  html body .divide-y>*+*{border-top-width:0}
+}

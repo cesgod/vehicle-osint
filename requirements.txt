@@ -1,0 +1,22 @@
+# Pinned, mutually compatible versions. Works on Python 3.10 - 3.13 (3.11+ recommended).
+fastapi==0.115.6
+uvicorn==0.34.0
+sqlalchemy==2.0.36
+jinja2==3.1.5
+python-multipart==0.0.20
+python-dotenv==1.0.1
+
+# Google ecosystem
+google-auth==2.37.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.156.0
+google-cloud-vision==3.9.0
+
+# Local image preprocessing + fuzzy plate matching
+numpy==2.2.1
+opencv-python-headless==4.10.0.84
+rapidfuzz==3.11.0
+
+# Optional offline OCR fallback (large download, ~2 GB with PyTorch).
+# Install only if you want OCR without Google sign-in:
+#   .venv\Scripts\python -m pip install easyocr==1.7.2

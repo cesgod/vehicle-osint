@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<title>Vehicle OSINT Aggregator</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+<style>
+  [x-cloak]{display:none!important}
+  .plate{font-family:ui-monospace,Consolas,monospace;letter-spacing:.12em}
+  mark{background:var(--accent-soft);color:inherit;font-weight:600;border-radius:4px;padding:0 3px}
+{% include 'neu.css' %}
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased" x-data="app()" x-init="init()" x-cloak>
+
+<header class="bg-slate-900 text-white">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+    <div class="mr-auto">
+      <h1 class="text-lg font-semibold">Vehicle OSINT Aggregator</h1>
+      <p class="text-xs text-slate-400">Public listings via Google's index only · v{{ version }}</p>
+    </div>
+    <span class="text-xs px-2 py-1 rounded font-medium"
+          :class="{advanced:'bg-emerald-500/20 text-emerald-300',standard:'bg-sky-500/20 text-sky-300',link:'bg-amber-500/20 text-amber-300'}[status.mode]"
+          x-text="{advanced:'Advanced mode',standard:'Standard mode',link:'Link mode (no keys)'}[status.mode]"></span>
+    <template x-if="status.signed_in">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="text-slate-300" x-text="status.email"></span>
+        <button @click="logout()" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600">Sign out</button>
+      </div>
+    </template>
+    <template x-if="!status.signed_in">
+      <button @click="signIn()" class="px-3 py-1.5 rounded bg-white text-slate-900 text-sm font-medium hover:bg-slate-200">Sign in with Google</button>
+    </template>
+  </div>
+  <nav class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+    <template x-for="t in tabs" :key="t.id">
+      <button @click="tab=t.id" class="px-4 py-2 text-sm rounded-t whitespace-nowrap"
+              :class="tab===t.id ? 'bg-slate-100 text-slate-900 font-medium' : 'text-slate-300 hover:text-white'">
+        <span x-text="t.name"></span>
+        <span x-show="t.id==='results' && results.length" class="ml-1 text-xs opacity-70" x-text="'('+results.length+')'"></span>
+      </button>
+    </template>
+  </nav>
+</header>
+
+<div x-show="toast" x-transition class="fixed bottom-4 right-4 z-50 max-w-md px-4 py-3 rounded shadow-lg text-sm text-white"
+     :class="toastKind==='error' ? 'bg-red-600' : 'bg-slate-800'" x-text="toast" @click="toast=''"></div>
+
+<main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+<!-- ============================ SEARCH ============================ -->
+<section x-show="tab==='search'" class="grid lg:grid-cols-3 gap-6">
+  <div class="bg-white rounded-lg shadow-sm p-5 space-y-4">
+    <h2 class="font-semibold">What are you looking for?</h2>
+    <div>
+      <label class="text-xs font-medium text-slate-500" for="f-plate">License plate</label>
+      <input id="f-plate" x-model="form.plate" @input.debounce.300ms="preview()" placeholder="ABCD 123"
+             class="plate mt-1 w-full border rounded px-3 py-2 text-lg uppercase focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <p class="text-xs mt-1" :class="plateInfo.format ? 'text-emerald-600' : 'text-slate-400'"
+         x-text="plateInfo.format ? ({mercosur:'Mercosur format (ABCD 123)','mercosur-moto':'Mercosur motorcycle (123 ABCD)',legacy:'Legacy format (ABC 123)'}[plateInfo.format]) : (form.plate ? 'Unrecognized format — will still be searched as typed' : 'Mercosur ABCD 123 or legacy ABC 123')"></p>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <template x-for="f in [['make','Make','Toyota'],['model','Model','Hilux'],['year','Year','2015'],['color','Color','blanco']]" :key="f[0]">
+        <div>
+          <label class="text-xs font-medium text-slate-500" :for="'f-'+f[0]" x-text="f[1]"></label>
+          <input :id="'f-'+f[0]" x-model="form[f[0]]" @input.debounce.300ms="preview()" :placeholder="f[2]"
+                 class="mt-1 w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+        </div>
+      </template>
+    </div>
+    <div>
+      <label class="text-xs font-medium text-slate-500" for="f-location">City / department</label>
+      <input id="f-location" x-model="form.location" @input.debounce.300ms="preview()" list="locs" placeholder="Villarrica"
+             class="mt-1 w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+      <datalist id="locs"><option>Villarrica</option><option>Asunción</option><option>Guairá</option><option>Central</option><option>Ciudad del Este</option><option>Encarnación</option></datalist>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <label for="f-maxq" class="text-slate-500">Queries</label>
+      <input id="f-maxq" type="number" min="1" max="10" x-model.number="form.max_queries" @change="preview()" class="w-16 border rounded px-2 py-1">
+      <label for="f-pages" class="text-slate-500">Pages each</label>
+      <input id="f-pages" type="number" min="1" max="5" x-model.number="form.pages" class="w-16 border rounded px-2 py-1">
+    </div>
+    <button @click="search()" :disabled="busy || !status.cse_configured"
+            class="w-full py-2.5 rounded bg-sky-600 text-white font-medium hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed">
+      <span x-text="busy ? 'Searching…' : 'Search with Google API'"></span>
+    </button>
+    <p x-show="!status.cse_configured" class="text-xs text-slate-500">
+      No API key yet — use the links on the right (free, no setup), or add a key in
+      <button class="underline" @click="tab='settings'">Settings</button>.
+    </p>
+    <p x-show="status.cse_configured" class="text-xs text-slate-500">
+      Uses up to <span x-text="queries.length * form.pages"></span> of
+      <span x-text="status.quota.customsearch.remaining"></span> queries left today. Repeats within 24 h are free (cached).
+    </p>
+    <button @click="demo()" class="w-full py-2 rounded border text-sm hover:bg-slate-50">Load demo data</button>
+  </div>
+
+  <div class="lg:col-span-2 space-y-6">
+    <div class="bg-white rounded-lg shadow-sm p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">Generated Google queries</h2>
+        <span class="text-xs text-slate-500" x-text="queries.length + ' queries'"></span>
+      </div>
+      <p x-show="!queries.length" class="text-sm text-slate-500">Type a plate or a make and model to see the search operators.</p>
+      <ul class="divide-y">
+        <template x-for="q in queries" :key="q.query">
+          <li class="py-2.5 flex items-start gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-medium text-slate-500" x-text="q.label"></div>
+              <code class="text-xs break-words text-slate-700" x-text="q.query"></code>
+            </div>
+            <a :href="q.google_url" target="_blank" rel="noopener" class="shrink-0 text-sm px-3 py-1.5 rounded bg-slate-800 text-white hover:bg-slate-700">Open in Google</a>
+          </li>
+        </template>
+      </ul>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm p-5">
+      <h2 class="font-semibold">Paste what you found</h2>
+      <p class="text-sm text-slate-500 mt-1 mb-3">Copy a result or listing (text plus its link) and paste it here. Separate entries with a blank line.
+        The app extracts plates, phones, prices and locations, scores the match and adds it to the results.</p>
+      <textarea id="f-paste" x-model="pasteText" rows="5" placeholder="Vendo Hilux 2015 chapa ABCD 123, 0981 555 010&#10;https://…"
+                class="w-full border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+      <div class="mt-2 flex items-center gap-3">
+        <button @click="importPaste()" :disabled="!pasteText.trim()" class="px-4 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 disabled:opacity-40">Analyze &amp; add</button>
+        <label class="text-sm text-slate-600 flex items-center gap-2" x-show="current">
+          <input type="checkbox" x-model="pasteIntoCurrent" id="f-paste-cur"> add to current search
+        </label>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm p-5" x-show="history.length">
+      <h2 class="font-semibold mb-3">Search history</h2>
+      <ul class="divide-y text-sm">
+        <template x-for="s in history" :key="s.id">
+          <li class="py-2 flex items-center gap-3">
+            <button class="plate font-semibold hover:underline" @click="openSearch(s.id)" x-text="fmtPlate(s.plate) || [s.make,s.model].join(' ') || 'search #'+s.id"></button>
+            <span class="text-slate-500" x-text="[s.make,s.model,s.year,s.location].filter(Boolean).join(' · ')"></span>
+            <span class="ml-auto text-xs text-slate-400" x-text="s.mode + ' · ' + s.result_count + ' results · ' + s.created_at.slice(0,10)"></span>
+            <button class="text-xs text-red-600 hover:underline" @click="removeSearch(s.id)">Delete</button>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ RESULTS ============================ -->
+<section x-show="tab==='results'" class="space-y-4">
+  <div x-show="!current" class="bg-white rounded-lg shadow-sm p-8 text-center text-slate-500">
+    No results yet. Run a search, paste findings, or load the demo data from the Search tab.
+  </div>
+  <template x-if="current">
+  <div class="space-y-4">
+    <div class="bg-white rounded-lg shadow-sm p-4 flex flex-wrap items-end gap-3">
+      <div class="mr-auto">
+        <div class="plate text-xl font-bold" x-text="fmtPlate(current.plate) || 'Vehicle search'"></div>
+        <div class="text-xs text-slate-500" x-text="[current.make,current.model,current.year,current.color,current.location].filter(Boolean).join(' · ')"></div>
+      </div>
+      <div><label class="block text-xs text-slate-500" for="fl-platform">Source</label>
+        <select id="fl-platform" x-model="filters.platform" class="border rounded px-2 py-1.5 text-sm">
+          <option value="">All sources</option>
+          <template x-for="p in status.platforms" :key="p"><option x-text="p"></option></template>
+        </select></div>
+      <div><label class="block text-xs text-slate-500" for="fl-match">Match</label>
+        <select id="fl-match" x-model="filters.match" class="border rounded px-2 py-1.5 text-sm">
+          <option value="">Any match</option><option value="exact">Exact text</option><option value="fuzzy">Fuzzy text</option><option value="context">Vehicle details only</option>
+        </select></div>
+      <div><label class="block text-xs text-slate-500" for="fl-loc">Location</label>
+        <input id="fl-loc" x-model="filters.location" placeholder="Villarrica" class="border rounded px-2 py-1.5 text-sm w-32"></div>
+      <div><label class="block text-xs text-slate-500" for="fl-attr">Make / model / year / color</label>
+        <input id="fl-attr" x-model="filters.attr" placeholder="Hilux 2015" class="border rounded px-2 py-1.5 text-sm w-40"></div>
+      <div><label class="block text-xs text-slate-500" for="fl-conf">Min. confidence <span x-text="Math.round(filters.minConf*100)+'%'"></span></label>
+        <input id="fl-conf" type="range" min="0" max="1" step="0.05" x-model.number="filters.minConf" class="w-32"></div>
+      <a :href="'/api/export/csv?search_id='+current.id" class="px-3 py-1.5 rounded border text-sm hover:bg-slate-50">CSV</a>
+      <button @click="exportSheets()" :disabled="exporting" class="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-50"
+              x-text="exporting ? 'Exporting…' : 'Export to Google Sheets'"></button>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-sm overflow-x-auto">
+      <table class="w-full text-sm stack-sm">
+        <thead class="bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wide">
+          <tr><th class="px-3 py-2">Confidence</th><th class="px-3 py-2">Listing</th><th class="px-3 py-2">Source</th><th class="px-3 py-2">Extracted</th><th class="px-3 py-2">Date</th><th class="px-3 py-2">Image</th></tr>
+        </thead>
+        <tbody class="divide-y">
+          <template x-for="r in filtered" :key="r.id">
+            <tr class="align-top hover:bg-slate-50">
+              <td data-label="Confidence" class="px-3 py-3 whitespace-nowrap">
+                <div class="font-semibold tabular-nums" x-text="Math.round(r.confidence*100)+'%'"></div>
+                <span class="text-xs px-1.5 py-0.5 rounded" :class="matchClass(r.match_type)" x-text="matchLabel(r.match_type)"></span>
+                <div class="plate text-xs mt-1 text-slate-500" x-text="r.matched_text"></div>
+              </td>
+              <td data-label="Listing" class="px-3 py-3 max-w-md">
+                <a :href="r.url.startsWith('http') ? r.url : null" target="_blank" rel="noopener" class="font-medium text-sky-700 hover:underline" x-text="r.title"></a>
+                <p class="text-slate-600 mt-1 text-xs leading-relaxed" x-html="highlight(r.snippet, r.matched_text)"></p>
+                <div class="text-xs text-slate-400 mt-1" x-text="r.query_labels.join(' · ')"></div>
+              </td>
+              <td data-label="Source" class="px-3 py-3 whitespace-nowrap">
+                <span class="text-xs px-2 py-0.5 rounded bg-slate-100" x-text="r.platform"></span>
+                <div class="text-xs text-slate-400 mt-1" x-text="r.display_link"></div>
+              </td>
+              <td data-label="Extracted" class="px-3 py-3 text-xs space-y-1">
+                <div x-show="r.phones.length"><span class="text-slate-400">Phone</span> <span class="font-mono" x-text="r.phones.join(', ')"></span></div>
+                <div x-show="r.sellers.length"><span class="text-slate-400">Seller</span> <span x-text="r.sellers.join(', ')"></span></div>
+                <div x-show="r.prices.length"><span class="text-slate-400">Price</span> <span x-text="r.prices.join(', ')"></span></div>
+                <div x-show="r.locations.length"><span class="text-slate-400">Place</span> <span x-text="r.locations.join(', ')"></span></div>
+                <div x-show="r.plates_found.length"><span class="text-slate-400">Plates</span> <span class="plate" x-text="r.plates_found.map(fmtPlate).join(', ')"></span></div>
+              </td>
+              <td data-label="Date" class="px-3 py-3 whitespace-nowrap text-xs">
+                <span x-text="(r.published_at || r.first_seen || '').slice(0,10)"></span>
+                <div class="text-slate-400" x-text="r.published_at ? 'published' : 'first seen'"></div>
+              </td>
+              <td data-label="Image" class="px-3 py-3 whitespace-nowrap text-xs">
+                <template x-if="r.lens_url">
+                  <div class="space-y-1">
+                    <img :src="r.thumbnail" alt="" class="w-16 h-12 object-cover rounded" loading="lazy" referrerpolicy="no-referrer">
+                    <a :href="r.lens_url" target="_blank" rel="noopener" class="block text-sky-700 hover:underline">Google Lens</a>
+                    <a :href="r.reverse_image_url" target="_blank" rel="noopener" class="block text-sky-700 hover:underline">Reverse image</a>
+                  </div>
+                </template>
+                <span x-show="!r.lens_url" class="text-slate-300">—</span>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="!filtered.length"><td colspan="6" class="px-3 py-8 text-center text-slate-500">No results match these filters.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-slate-500" x-text="filtered.length + ' of ' + results.length + ' results shown'"></p>
+  </div>
+  </template>
+</section>
+
+<!-- ============================ ANALYTICS ============================ -->
+<section x-show="tab==='analytics'" class="space-y-6">
+  <div x-show="!current" class="bg-white rounded-lg shadow-sm p-8 text-center text-slate-500">Analytics appear once a search has results.</div>
+  <template x-if="current && analytics">
+  <div class="space-y-6">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-lg shadow-sm p-4"><div class="text-xs text-slate-500">Results</div><div class="text-2xl font-semibold" x-text="analytics.total"></div></div>
+      <div class="bg-white rounded-lg shadow-sm p-4"><div class="text-xs text-slate-500">Exact plate matches</div><div class="text-2xl font-semibold text-emerald-600" x-text="analytics.by_match.exact || 0"></div></div>
+      <div class="bg-white rounded-lg shadow-sm p-4"><div class="text-xs text-slate-500">Fuzzy matches</div><div class="text-2xl font-semibold text-amber-600" x-text="analytics.by_match.fuzzy || 0"></div></div>
+      <div class="bg-white rounded-lg shadow-sm p-4"><div class="text-xs text-slate-500">Recurring phones / sellers</div><div class="text-2xl font-semibold" x-text="analytics.phones.concat(analytics.sellers).filter(e=>e.recurring).length"></div></div>
+    </div>
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-lg shadow-sm p-5">
+        <h2 class="font-semibold mb-1">Recurring entities</h2>
+        <p class="text-xs text-slate-500 mb-3">Highlighted rows appear in more than one listing.</p>
+        <template x-for="g in [['phones','Phone numbers'],['sellers','Seller accounts'],['prices','Prices'],['locations','Locations'],['plates','Plates seen in text']]" :key="g[0]">
+          <div class="mb-4" x-show="analytics[g[0]].length">
+            <h3 class="text-xs font-medium uppercase tracking-wide text-slate-500 mb-1" x-text="g[1]"></h3>
+            <ul class="text-sm">
+              <template x-for="e in analytics[g[0]]" :key="e.value">
+                <li class="flex justify-between px-2 py-1 rounded" :class="e.recurring ? 'bg-amber-50 font-medium' : ''">
+                  <span :class="g[0]==='plates' ? 'plate' : (g[0]==='phones' ? 'font-mono' : '')" x-text="g[0]==='plates' ? fmtPlate(e.value) : e.value"></span>
+                  <span class="text-slate-500 tabular-nums" x-text="e.count + '×'"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+        </template>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm p-5">
+        <h2 class="font-semibold mb-1">Timeline</h2>
+        <p class="text-xs text-slate-500 mb-4">Publication date when the page states one; otherwise the day this app first saw it (hollow dot).</p>
+        <ol class="relative border-l-2 border-slate-200 ml-2 space-y-4">
+          <template x-for="t in analytics.timeline" :key="t.id">
+            <li class="pl-5 relative">
+              <span class="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full border-2"
+                    :class="t.dated ? 'bg-sky-600 border-sky-600' : 'bg-white border-slate-400'"></span>
+              <div class="text-xs text-slate-500 tabular-nums" x-text="t.date + ' · ' + t.platform + (t.locations.length ? ' · ' + t.locations.join(', ') : '')"></div>
+              <a :href="t.url.startsWith('http') ? t.url : null" target="_blank" rel="noopener" class="text-sm text-sky-700 hover:underline" x-text="t.title"></a>
+              <span class="ml-1 text-xs px-1.5 py-0.5 rounded" :class="matchClass(t.match_type)" x-text="matchLabel(t.match_type)"></span>
+            </li>
+          </template>
+        </ol>
+      </div>
+    </div>
+  </div>
+  </template>
+</section>
+
+<!-- ============================ IMAGES ============================ -->
+<section x-show="tab==='images'" class="space-y-6">
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-lg shadow-sm p-5">
+      <h2 class="font-semibold mb-3">Drop screenshots or photos</h2>
+      <div @dragover.prevent="drag=true" @dragleave.prevent="drag=false" @drop.prevent="drag=false; upload($event.dataTransfer.files)"
+           @click="$refs.file.click()" class="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition"
+           :class="drag ? 'border-sky-500 bg-sky-50' : 'border-slate-300 hover:border-slate-400'">
+        <p class="text-sm text-slate-600" x-text="uploading ? 'Analyzing…' : 'Drag images here, or click to choose'"></p>
+        <p class="text-xs text-slate-400 mt-1">JPG, PNG, WebP · up to 50 at a time</p>
+        <input type="file" x-ref="file" id="f-files" multiple accept="image/*" class="hidden" @change="upload($event.target.files); $event.target.value=''">
+      </div>
+      <label class="block text-xs text-slate-500 mt-3" for="f-img-plate">Plate to look for (optional)</label>
+      <input id="f-img-plate" x-model="imgPlate" placeholder="ABCD 123" class="plate uppercase mt-1 border rounded px-3 py-1.5 text-sm w-40">
+    </div>
+    <div class="bg-white rounded-lg shadow-sm p-5">
+      <h2 class="font-semibold mb-3">Scan a local folder</h2>
+      <label class="text-xs text-slate-500" for="f-folder">Folder path on this computer (subfolders included, first 200 images)</label>
+      <div class="flex gap-2 mt-1">
+        <input id="f-folder" x-model="folder" placeholder="C:\Users\you\Pictures\listings" class="flex-1 border rounded px-3 py-2 text-sm font-mono">
+        <button @click="scanFolder()" :disabled="uploading || !folder" class="px-4 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 disabled:opacity-40">Scan</button>
+      </div>
+      <div class="mt-4 text-sm rounded p-3" :class="status.ocr_engine==='none' ? 'bg-amber-50 text-amber-800' : 'bg-slate-50 text-slate-600'">
+        <template x-if="status.ocr_engine==='google-vision'"><span>OCR engine: <b>Google Cloud Vision</b> · <span x-text="status.quota.vision.used + ' of ' + status.quota.vision.budget"></span> units used this month (2 per image).</span></template>
+        <template x-if="status.ocr_engine==='easyocr'"><span>OCR engine: <b>EasyOCR</b> (offline). Sign in with Google for Cloud Vision accuracy and vehicle detection.</span></template>
+        <template x-if="status.ocr_engine==='none'"><span>Reading plate text needs Google sign-in (Advanced mode) or the optional EasyOCR install. Until then images are preprocessed and a plate-shaped region is cropped, but no text is read.</span></template>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow-sm overflow-x-auto" x-show="scans.length">
+    <div class="flex items-center justify-between px-4 py-3">
+      <h2 class="font-semibold">Image scans</h2>
+      <button class="text-xs text-red-600 hover:underline" @click="clearScans()">Clear list</button>
+    </div>
+    <table class="w-full text-sm stack-sm">
+      <thead class="bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wide">
+        <tr><th class="px-3 py-2">Plate crop</th><th class="px-3 py-2">File</th><th class="px-3 py-2">Plate read</th><th class="px-3 py-2">Vehicle</th><th class="px-3 py-2">Cross-references</th></tr>
+      </thead>
+      <tbody class="divide-y">
+        <template x-for="s in scans" :key="s.id">
+          <tr class="align-top">
+            <td data-label="Plate crop" class="px-3 py-3"><img x-show="s.crop_url" :src="s.crop_url" alt="Cropped plate region" class="h-14 rounded border"><span x-show="!s.crop_url" class="text-slate-300">—</span></td>
+            <td data-label="File" class="px-3 py-3"><div class="break-all max-w-xs" x-text="s.filename"></div><div class="text-xs text-slate-400" x-text="s.engine"></div>
+              <div class="text-xs text-red-600 mt-1 max-w-xs" x-show="s.error" x-text="s.error"></div></td>
+            <td data-label="Plate read" class="px-3 py-3 whitespace-nowrap">
+              <template x-for="p in s.plates" :key="p.plate">
+                <div><span class="plate font-semibold" x-text="fmtPlate(p.plate)"></span>
+                  <span class="text-xs text-slate-500 tabular-nums" x-text="Math.round(p.confidence*100)+'%'"></span>
+                  <span class="text-xs text-amber-600" x-show="p.corrected" x-text="'read as ' + p.read_as"></span></div>
+              </template>
+              <span x-show="!s.plates.length" class="text-slate-400 text-xs">none found</span>
+            </td>
+            <td data-label="Vehicle" class="px-3 py-3 text-xs">
+              <div x-text="s.vehicles.map(v=>v.name+' '+Math.round(v.score*100)+'%').join(', ')"></div>
+              <div class="text-slate-500" x-show="s.colors.length" x-text="'Color: ' + s.colors.join(', ')"></div>
+            </td>
+            <td data-label="Cross-references" class="px-3 py-3 text-xs">
+              <template x-for="(m,i) in s.matches" :key="i">
+                <div><button class="text-sky-700 hover:underline" @click="openSearch(m.search_id)"
+                     x-text="m.kind==='search' ? ('Search for ' + fmtPlate(m.plate) + ' (' + m.match + ')') : ('Listing: ' + m.title)"></button></div>
+              </template>
+              <span x-show="!s.matches.length" class="text-slate-400">no stored match</span>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================ SETTINGS ============================ -->
+<section x-show="tab==='settings'" class="grid lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-lg shadow-sm p-5 space-y-3">
+    <h2 class="font-semibold">Standard mode · Google Custom Search</h2>
+    <p class="text-sm text-slate-500">Optional. Lets the app run the queries itself (100 free per day). Saved to <code>.env</code> on this computer and applied immediately.</p>
+    <div><label class="text-xs text-slate-500" for="s-key">API key <span x-show="status.api_key_hint" x-text="'(saved: '+status.api_key_hint+')'"></span></label>
+      <input id="s-key" type="password" x-model="settings.google_api_key" autocomplete="off" placeholder="AIza…" class="mt-1 w-full border rounded px-3 py-2 text-sm font-mono"></div>
+    <div><label class="text-xs text-slate-500" for="s-cx">Search engine ID (cx)</label>
+      <input id="s-cx" x-model="settings.google_cse_id" placeholder="0123456789abcdefg" class="mt-1 w-full border rounded px-3 py-2 text-sm font-mono"></div>
+    <button @click="saveSettings()" class="px-4 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700">Save</button>
+    <p class="text-xs text-slate-500">Today: <span x-text="status.quota.customsearch.used + ' of ' + status.quota.customsearch.budget"></span> queries used.</p>
+  </div>
+  <div class="bg-white rounded-lg shadow-sm p-5 space-y-3">
+    <h2 class="font-semibold">Advanced mode · Sign in with Google</h2>
+    <p class="text-sm text-slate-500">Adds Cloud Vision OCR and one-click Google Sheets export. Upload the OAuth client file once (see README), then sign in.</p>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="w-2.5 h-2.5 rounded-full" :class="status.oauth_client ? 'bg-emerald-500' : 'bg-slate-300'"></span>
+      <span x-text="status.oauth_client ? 'client_secret.json is in place' : 'client_secret.json not uploaded yet'"></span>
+    </div>
+    <input type="file" id="s-secret" accept=".json,application/json" @change="uploadSecret($event.target.files[0]); $event.target.value=''" class="text-sm">
+    <div>
+      <button x-show="!status.signed_in" @click="signIn()" :disabled="!status.oauth_client" class="px-4 py-2 rounded bg-slate-900 text-white text-sm hover:bg-slate-700 disabled:opacity-40">Sign in with Google</button>
+      <p x-show="status.signed_in" class="text-sm text-emerald-700">Signed in as <b x-text="status.email"></b></p>
+    </div>
+    <p class="text-xs text-slate-500">Permissions requested: Cloud Vision, and Drive access limited to files this app creates.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="max-w-7xl mx-auto px-4 pb-8 text-xs text-slate-400">
+  Shows only what Google has publicly indexed. Verify any match against the original page before acting on it, and report suspected stolen vehicles to the police rather than contacting sellers yourself.
+</footer>
+
+<script>
+function app() {
+  return {
+    tabs: [{id:'search',name:'Search'},{id:'results',name:'Results'},{id:'analytics',name:'Analytics'},{id:'images',name:'Images'},{id:'settings',name:'Settings'}],
+    tab: 'search',
+    status: {mode:'link', signed_in:false, email:'', cse_configured:false, oauth_client:false, ocr_engine:'none', platforms:[], api_key_hint:'',
+             quota:{customsearch:{used:0,budget:100,remaining:100}, vision:{used:0,budget:1000}}},
+    form: {plate:'', make:'', model:'', year:'', color:'', location:'', max_queries:6, pages:1},
+    plateInfo: {}, queries: [], history: [],
+    current: null, results: [], analytics: null,
+    filters: {platform:'', match:'', location:'', attr:'', minConf:0},
+    pasteText: '', pasteIntoCurrent: true,
+    scans: [], imgPlate: '', folder: '', drag: false, uploading: false,
+    settings: {google_api_key:'', google_cse_id:''},
+    busy: false, exporting: false, toast: '', toastKind: 'info',
+
+    async init() {
+      const qs = new URLSearchParams(location.search);
+      if (qs.get('auth_error')) this.notify(qs.get('auth_error'), 'error');
+      if (qs.get('signed_in')) this.notify('Signed in. Advanced mode is on.');
+      if (qs.toString()) history.replaceState(null, '', '/');
+      await this.refreshStatus();
+      this.settings.google_cse_id = this.status.cse_id || '';
+      this.history = await this.api('/api/searches');
+      this.scans = await this.api('/api/images');
+      if (this.history.length) await this.openSearch(this.history[0].id, false);
+    },
+    async api(url, opts = {}) {
+      if (opts.json) { opts.method = opts.method || 'POST'; opts.headers = {'Content-Type':'application/json'}; opts.body = JSON.stringify(opts.json); }
+      const res = await fetch(url, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || ('Request failed (' + res.status + ')'));
+      return data;
+    },
+    notify(msg, kind = 'info') { this.toast = msg; this.toastKind = kind; clearTimeout(this._t); this._t = setTimeout(() => this.toast = '', kind === 'error' ? 9000 : 4000); },
+    async run(fn) { try { return await fn(); } catch (e) { this.notify(e.message, 'error'); } },
+    async refreshStatus() { await this.run(async () => { this.status = await this.api('/api/status'); }); },
+
+    fmtPlate(p) { return (p || '').match(/[A-Z]+|\d+/g)?.join(' ') || ''; },
+    matchLabel(m) { return {exact:'Exact text', fuzzy:'Fuzzy text', ocr:'Vision OCR', context:'Details only'}[m] || m; },
+    matchClass(m) { return {exact:'bg-emerald-100 text-emerald-800', fuzzy:'bg-amber-100 text-amber-800', ocr:'bg-violet-100 text-violet-800', context:'bg-slate-100 text-slate-600'}[m]; },
+    esc(s) { return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+    highlight(text, needle) {
+      const safe = this.esc(text);
+      if (!needle) return safe;
+      const n = this.esc(needle).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return safe.replace(new RegExp(n, 'gi'), m => '<mark>' + m + '</mark>');
+    },
+
+    async preview() {
+      await this.run(async () => {
+        const d = await this.api('/api/queries/preview', {json: this.form});
+        this.queries = d.queries; this.plateInfo = d.plate;
+      });
+    },
+    show(d) {
+      this.current = d.search; this.results = d.results; this.analytics = d.analytics;
+      this.filters = {platform:'', match:'', location:'', attr:'', minConf:0};
+    },
+    async afterChange(d, msg) {
+      this.show(d); this.tab = 'results';
+      this.history = await this.api('/api/searches');
+      await this.refreshStatus();
+      const err = (d.errors || []).join(' ');
+      this.notify(err || msg, err ? 'error' : 'info');
+    },
+    async search() {
+      this.busy = true;
+      await this.run(async () => {
+        const d = await this.api('/api/search', {json: this.form});
+        await this.afterChange(d, d.results.length + ' results · ' + d.stats.api_calls + ' API calls, ' + d.stats.cache_hits + ' from cache');
+      });
+      this.busy = false;
+    },
+    async importPaste() {
+      await this.run(async () => {
+        const body = {...this.form, text: this.pasteText};
+        if (this.current && this.pasteIntoCurrent) body.search_id = this.current.id;
+        const d = await this.api('/api/import', {json: body});
+        this.pasteText = '';
+        await this.afterChange(d, d.stats.imported + ' entries analyzed');
+      });
+    },
+    async demo() { await this.run(async () => { await this.afterChange(await this.api('/api/demo', {method:'POST'}), 'Demo data loaded (fictional listings).'); }); },
+    async openSearch(id, go = true) {
+      await this.run(async () => {
+        const d = await this.api('/api/searches/' + id);
+        this.show(d);
+        const s = d.search;
+        this.form = {...this.form, plate: this.fmtPlate(s.plate), make: s.make, model: s.model, year: s.year, color: s.color, location: s.location};
+        this.queries = s.queries; this.preview();
+        if (go) this.tab = 'results';
+      });
+    },
+    async removeSearch(id) {
+      await this.run(async () => {
+        await this.api('/api/searches/' + id, {method:'DELETE'});
+        this.history = this.history.filter(s => s.id !== id);
+        if (this.current && this.current.id === id) { this.current = null; this.results = []; this.analytics = null; }
+      });
+    },
+    get filtered() {
+      const f = this.filters, loc = f.location.trim().toLowerCase(), attrs = f.attr.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      return this.results.filter(r => {
+        if (f.platform && r.platform !== f.platform) return false;
+        if (f.match && r.match_type !== f.match) return false;
+        if (r.confidence < f.minConf) return false;
+        const text = (r.title + ' ' + r.snippet + ' ' + r.locations.join(' ')).toLowerCase();
+        if (loc && !text.includes(loc)) return false;
+        return attrs.every(a => text.includes(a));
+      });
+    },
+    async exportSheets() {
+      if (!this.status.signed_in) { this.notify('Sign in with Google first (Settings tab). CSV export works without sign-in.', 'error'); return; }
+      this.exporting = true;
+      await this.run(async () => {
+        const d = await this.api('/api/export/sheets', {json: {search_id: this.current.id}});
+        window.open(d.url, '_blank');
+        this.notify('Spreadsheet created in your Google Drive.');
+      });
+      this.exporting = false;
+    },
+
+    async upload(files) {
+      if (!files || !files.length) return;
+      const fd = new FormData();
+      [...files].forEach(f => fd.append('files', f));
+      fd.append('plate', this.imgPlate);
+      this.uploading = true;
+      await this.run(async () => {
+        const d = await this.api('/api/images/upload', {method:'POST', body: fd});
+        this.scans = d.concat(this.scans);
+        this.notify(d.length + ' image(s) analyzed · ' + d.filter(s => s.best_plate).length + ' with a plate');
+        await this.refreshStatus();
+      });
+      this.uploading = false;
+    },
+    async scanFolder() {
+      this.uploading = true;
+      await this.run(async () => {
+        const d = await this.api('/api/images/scan-folder', {json: {path: this.folder, plate: this.imgPlate}});
+        this.scans = d.reverse().concat(this.scans);
+        this.notify(d.length + ' image(s) analyzed');
+        await this.refreshStatus();
+      });
+      this.uploading = false;
+    },
+    async clearScans() { await this.run(async () => { await this.api('/api/images', {method:'DELETE'}); this.scans = []; }); },
+
+    async saveSettings() {
+      await this.run(async () => {
+        const body = {google_cse_id: this.settings.google_cse_id};
+        if (this.settings.google_api_key) body.google_api_key = this.settings.google_api_key;
+        await this.api('/api/settings', {json: body});
+        this.settings.google_api_key = '';
+        await this.refreshStatus();
+        this.notify(this.status.cse_configured ? 'Saved. Standard mode is on.' : 'Saved.');
+      });
+    },
+    async uploadSecret(file) {
+      if (!file) return;
+      const fd = new FormData(); fd.append('file', file);
+      await this.run(async () => {
+        await this.api('/api/settings/client-secret', {method:'POST', body: fd});
+        await this.refreshStatus();
+        this.notify('OAuth client saved. You can sign in now.');
+      });
+    },
+    signIn() {
+      if (!this.status.oauth_client) { this.tab = 'settings'; this.notify('Upload client_secret.json first (one-time setup, see README).', 'error'); return; }
+      location.href = '/auth/login';
+    },
+    async logout() { await this.run(async () => { await this.api('/auth/logout', {method:'POST'}); await this.refreshStatus(); }); },
+  };
+}
+</script>
+</body>
+</html>

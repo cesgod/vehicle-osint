@@ -1,0 +1,566 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chapa Finder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: soft-extruded control column (plate + filters) beside a tabbed work area.
+   Phones: one column, tabs become a raised bottom bar within thumb reach. */
+:root{
+  --bg:#e4e9f0; --ink:#26304a; --muted:#5f6a82; --line:#cdd5e0;
+  --hi:#ffffff; --lo:#b6bfcd;
+  --accent:#2350b0; --accent-ink:#ffffff; --accent-soft:#d6e0f4;
+  --band:#1d47a3; --band-ink:#ffffff; --plate:#fbfcfe; --plate-ink:#111;
+  --exact:#0d7040; --fuzzy:#8a5200; --vehicle:#5a3fa8; --none:#5f6a82;
+  --raise:7px 7px 16px var(--lo),-7px -7px 16px var(--hi);
+  --raise-sm:4px 4px 9px var(--lo),-4px -4px 9px var(--hi);
+  --inset:inset 3px 3px 7px var(--lo),inset -3px -3px 7px var(--hi);
+  --r-lg:24px; --r-md:16px; --r-sm:12px;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#252c3a; --ink:#e1e7f2; --muted:#9ba6bc; --line:#343d50;
+  --hi:#2f384a; --lo:#191e29;
+  --accent:#86a8f6; --accent-ink:#121a2e; --accent-soft:#2c3958;
+  --band:#2a5bc4; --plate:#eef1f6;
+  --exact:#66d6a0; --fuzzy:#f2b75e; --vehicle:#bba6f7; --none:#9ba6bc;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#252c3a; --ink:#e1e7f2; --muted:#9ba6bc; --line:#343d50;
+  --hi:#2f384a; --lo:#191e29;
+  --accent:#86a8f6; --accent-ink:#121a2e; --accent-soft:#2c3958;
+  --band:#2a5bc4; --plate:#eef1f6;
+  --exact:#66d6a0; --fuzzy:#f2b75e; --vehicle:#bba6f7; --none:#9ba6bc;
+  color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-block:24px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:24px}
+h1{font-family:var(--f-display);font-weight:700;font-size:38px;letter-spacing:.01em;margin:0;line-height:1;text-shadow:2px 2px 3px var(--lo),-2px -2px 3px var(--hi)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:7px 14px;border-radius:999px;background:var(--bg);box-shadow:var(--inset);color:var(--accent);font-weight:600}
+.grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:26px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--bg);border-radius:var(--r-lg);padding:20px;box-shadow:var(--raise)}
+.stack{display:flex;flex-direction:column;gap:14px}
+label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;margin:0 0 6px 4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:0;border-radius:var(--r-sm);padding:10px 12px;box-shadow:var(--inset);min-height:42px}
+input[type=range]{box-shadow:none;padding:0;min-height:28px;accent-color:var(--accent);background:transparent}
+textarea{font-family:var(--f-mono);font-size:13px;min-height:150px;resize:vertical;line-height:1.45}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.7}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button,.btn{font:inherit;font-weight:600;cursor:pointer;border:0;border-radius:var(--r-sm);padding:10px 16px;min-height:42px;background:var(--bg);color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;box-shadow:var(--raise-sm)}
+button:hover,.btn:hover{color:var(--accent)}
+button:active,.btn:active{box-shadow:var(--inset)}
+button.primary,.btn.primary{background:var(--accent);color:var(--accent-ink);box-shadow:4px 4px 10px var(--lo),-4px -4px 10px var(--hi)}
+button.primary:active{box-shadow:inset 3px 3px 6px rgba(0,0,0,.25)}
+.btnrow{display:flex;flex-wrap:wrap;gap:12px}
+hr{border:0;height:2px;margin:6px 0;border-radius:2px;box-shadow:var(--inset)}
+
+/* Mercosur-style plate, pressed into the panel like an embossed badge */
+.plate{border:3px solid var(--plate-ink);border-radius:10px;background:var(--plate);overflow:hidden;box-shadow:var(--raise-sm)}
+.plate .band{background:var(--band);color:var(--band-ink);font-family:var(--f-display);font-weight:600;font-size:11px;letter-spacing:.3em;text-align:center;padding:2px 0}
+.plate input{border-radius:0;box-shadow:none;background:transparent;color:var(--plate-ink);font-family:var(--f-display);font-weight:700;font-size:42px;text-align:center;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;min-height:0}
+.plate input::placeholder{color:#b8bcc6}
+.fmt{font-size:12.5px;color:var(--muted);margin:8px 0 0 4px}
+.fmt b{color:var(--ink)}
+
+.tabs{display:flex;gap:6px;padding:6px;border-radius:var(--r-md);box-shadow:var(--inset);margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;box-shadow:none;color:var(--muted);padding:8px 14px;min-height:40px;border-radius:var(--r-sm)}
+.tabs button[aria-selected="true"]{color:var(--accent);box-shadow:var(--raise-sm)}
+.count{font-family:var(--f-mono);font-size:11px;color:var(--accent);border-radius:999px;padding:0 7px;margin-left:2px;box-shadow:var(--inset)}
+h2{font-family:var(--f-display);font-size:22px;font-weight:600;margin:0 0 4px;letter-spacing:.01em}
+.hint{color:var(--muted);font-size:13.5px;margin:0 0 14px;max-width:70ch}
+
+#queries{display:flex;flex-direction:column;gap:12px}
+.q{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-radius:var(--r-md);box-shadow:var(--inset)}
+.q .lbl{font-weight:600;font-size:13.5px}
+.q code{display:block;font-family:var(--f-mono);font-size:11.5px;color:var(--muted);word-break:break-all;margin-top:3px}
+@media (max-width:520px){.q{grid-template-columns:minmax(0,1fr)}.q .btn{width:100%}}
+
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:16px}
+#results{display:flex;flex-direction:column;gap:16px}
+.res{border-radius:var(--r-md);padding:14px;display:grid;grid-template-columns:68px minmax(0,1fr);gap:14px;box-shadow:var(--raise-sm)}
+.conf{font-family:var(--f-mono);font-size:19px;font-weight:500;text-align:center;border-radius:50%;width:64px;height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;box-shadow:var(--inset)}
+.conf small{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-family:var(--f-body);font-weight:700;margin-top:2px}
+.m-exact{color:var(--exact)} .m-fuzzy{color:var(--fuzzy)} .m-vehicle{color:var(--vehicle)} .m-none{color:var(--none)}
+.res .t{font-weight:600;word-break:break-word}
+.res .t a{color:var(--ink)}
+.res .u{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);word-break:break-all}
+.res .s{margin:6px 0 8px;word-break:break-word}
+mark{background:var(--accent-soft);color:var(--fuzzy);font-weight:600;border-radius:4px;padding:0 3px}
+mark.x{color:var(--exact)}
+.tags{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.tag{font-size:12px;border-radius:999px;padding:3px 10px;color:var(--muted);box-shadow:var(--inset);font-variant-numeric:tabular-nums}
+.tag.p{color:var(--accent);font-weight:600}
+a.tag{text-decoration:none;box-shadow:var(--raise-sm)}
+a.tag:active{box-shadow:var(--inset)}
+@media (max-width:520px){.res{grid-template-columns:minmax(0,1fr)}.conf{width:auto;height:auto;flex-direction:row;gap:8px;border-radius:999px;padding:4px 12px;justify-self:start;font-size:15px}.conf small{margin:0}}
+
+.ents{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+.ent{padding:14px;border-radius:var(--r-md);box-shadow:var(--inset)}
+.ent h3{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 8px}
+.ent ol{list-style:none;padding:0;margin:0}
+.ent li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.ent li:last-child{border-bottom:0}
+.ent li span:first-child{word-break:break-all}
+.ent li .n{font-family:var(--f-mono);color:var(--muted)}
+.ent li.rep span:first-child{font-weight:700;color:var(--accent)}
+.empty{color:var(--muted);font-style:italic}
+
+.tl{position:relative;margin:0;padding:0 0 0 26px;list-style:none}
+.tl:before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:4px;border-radius:4px;box-shadow:var(--inset)}
+.tl li{position:relative;padding:0 0 20px}
+.tl li:before{content:"";position:absolute;left:-25px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--bg);box-shadow:var(--raise-sm)}
+.tl li.exact:before{background:var(--exact)}
+.tl li.fuzzy:before{background:var(--fuzzy)}
+.tl .d{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border-radius:var(--r-md);padding:12px 14px;box-shadow:var(--raise-sm)}
+.stat b{display:block;font-family:var(--f-display);font-size:30px;line-height:1}
+.stat span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+.ocr-out{font-family:var(--f-mono);font-size:13px;margin-top:10px;padding:10px 12px;border-radius:var(--r-sm);box-shadow:var(--inset);word-break:break-word}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:13px;z-index:30;max-width:calc(100% - 32px);text-align:center}
+.foot{margin-top:28px;color:var(--muted);font-size:12.5px;max-width:90ch}
+.foot code{font-family:var(--f-mono)}
+@media (prefers-reduced-motion:no-preference){button,.btn,a.tag{transition:box-shadow .18s ease,color .18s ease}}
+
+/* Phones: bottom tab bar, 16px inputs so iOS doesn't zoom, tighter panels */
+@media (max-width:640px){
+  body{font-size:15px}
+  h1{font-size:32px}
+  .wrap{padding-block:16px 120px}
+  .panel{padding:16px;border-radius:20px}
+  input,select,textarea{font-size:16px}
+  .plate input{font-size:38px}
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;margin:0;border-radius:22px 22px 0 0;background:var(--bg);
+    box-shadow:0 -6px 18px var(--lo);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;overflow:visible;
+    padding:8px max(10px,env(safe-area-inset-left,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right,0px))}
+  .tabs button{flex-direction:column;gap:0;font-size:11.5px;padding:6px 2px;min-height:48px;white-space:normal;line-height:1.15}
+  .count{margin:2px 0 0;font-size:10px}
+  .toast{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Chapa Finder</h1>
+      <p class="sub">Find public mentions of a Paraguayan license plate or vehicle across Google's index: Marketplace, Clasipar, Hendyla, social posts and news.</p>
+    </div>
+    <span class="chip">Runs in your browser · nothing to set up</span>
+  </header>
+
+  <div class="grid">
+    <aside class="panel stack" aria-label="Search">
+      <div>
+        <label for="plate">License plate</label>
+        <div class="plate"><div class="band">MERCOSUR · PY</div><input id="plate" value="ABCD 123" autocomplete="off" spellcheck="false" aria-describedby="fmt"></div>
+        <div class="fmt" id="fmt"></div>
+      </div>
+      <div class="row2">
+        <div><label for="make">Make</label><input id="make" value="Toyota"></div>
+        <div><label for="model">Model</label><input id="model" value="Hilux"></div>
+      </div>
+      <div class="row2">
+        <div><label for="year">Year</label><input id="year" value="2015" inputmode="numeric"></div>
+        <div><label for="color">Color</label><input id="color" value="blanco"></div>
+      </div>
+      <div><label for="loc">City / department</label><input id="loc" value="Villarrica" list="locs"></div>
+      <datalist id="locs"></datalist>
+      <div class="btnrow">
+        <button class="primary" id="go">Build searches</button>
+        <button id="openAll" title="Opens every query in a new tab">Open all</button>
+      </div>
+      <hr>
+      <div>
+        <label for="ocrIn">Check a plate read from a photo</label>
+        <input id="ocrIn" placeholder="e.g. A8CD 1Z3" autocomplete="off" spellcheck="false">
+        <div class="ocr-out" id="ocrOut">Type what you or an OCR app read from the image. Common confusions (0/O, 1/I, 8/B, 2/Z, 5/S) are corrected by position.</div>
+      </div>
+    </aside>
+
+    <main class="panel" style="min-width:0">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="queries" aria-selected="true">Searches<span class="count" id="cQ">0</span></button>
+        <button role="tab" data-tab="paste" aria-selected="false">Add findings</button>
+        <button role="tab" data-tab="results" aria-selected="false">Results<span class="count" id="cR">0</span></button>
+        <button role="tab" data-tab="analytics" aria-selected="false">Analytics</button>
+        <button role="tab" data-tab="timeline" aria-selected="false">Timeline</button>
+      </div>
+
+      <section data-panel="queries">
+        <h2>Google searches for this plate</h2>
+        <p class="hint">Every spelling of the plate (with and without space or hyphen) is OR-ed into each query, then scoped to one group of public sites. Open a search, then copy what you find into <b>Add findings</b>.</p>
+        <div id="queries"></div>
+      </section>
+
+      <section data-panel="paste" hidden>
+        <h2>Add what you found</h2>
+        <p class="hint">Paste the title, text and link of each listing or search result. Leave a blank line between entries. Image links (.jpg, .png, fbcdn, cdninstagram) get a Google Lens button.</p>
+        <textarea id="pasteIn" placeholder="Hilux 2015 blanca - Villarrica&#10;Vendo, chapa ABCD 123, tel 0981 555 010. 12 mar 2025&#10;https://www.facebook.com/marketplace/item/...&#10;&#10;Next entry..."></textarea>
+        <div class="btnrow" style="margin-top:10px">
+          <button class="primary" id="addBtn">Analyze and add</button>
+          <button id="demoBtn">Load example data</button>
+          <button id="clearBtn">Clear all results</button>
+        </div>
+        <p class="hint" id="clearConfirm" hidden style="margin-top:10px">Remove all <b id="clearN"></b> results from this browser? <button id="clearYes">Yes, clear</button> <button id="clearNo">Keep them</button></p>
+      </section>
+
+      <section data-panel="results" hidden>
+        <div class="filters">
+          <div><label for="fPlat">Source</label><select id="fPlat"><option value="">All sources</option></select></div>
+          <div><label for="fMatch">Match</label><select id="fMatch"><option value="">Any match</option><option value="exact">Exact plate</option><option value="fuzzy">Fuzzy plate</option><option value="vehicle">Vehicle only</option><option value="none">No match</option></select></div>
+          <div><label for="fConf">Min confidence <span id="fConfV">0%</span></label><input id="fConf" type="range" min="0" max="100" step="5" value="0"></div>
+          <div><label for="fText">Text or place</label><input id="fText" placeholder="Asunción, 0981…"></div>
+        </div>
+        <div class="btnrow" style="margin-bottom:8px">
+          <button id="copySheet" title="Tab-separated; paste straight into Google Sheets">Copy for Google Sheets</button>
+          <button id="copyCsv">Copy as CSV</button>
+        </div>
+        <div id="results"></div>
+      </section>
+
+      <section data-panel="analytics" hidden>
+        <div class="stats" id="stats"></div>
+        <p class="hint">Phone numbers, sellers, prices and places pulled from the text. Anything seen in two or more listings is bold.</p>
+        <div class="ents" id="ents"></div>
+      </section>
+
+      <section data-panel="timeline" hidden>
+        <h2>When this vehicle appeared</h2>
+        <p class="hint">Ordered by the date written in each listing (e.g. "12 mar 2025", "hace 3 días"). Entries without a date are listed by when you added them.</p>
+        <ol class="tl" id="tl"></ol>
+      </section>
+    </main>
+  </div>
+
+  <p class="foot">Everything stays in this browser. For automatic Google searching, Cloud Vision OCR on photos and export straight into Google Sheets, run the full app from the project folder (<code>newbuild/vehicle-osint/run.bat</code>). Results are only what Google has publicly indexed: verify each match on the original page, and report a suspected stolen vehicle to the police rather than contacting the seller.</p>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const strip = s => String(s || "").normalize("NFD").replace(/\p{M}/gu, "");
+
+/* ---------- Plates ---------- */
+const STOP = new Set("BMW KIA GOL FIAT AUDI FORD JEEP SEAT MINI AUTO MOTO FONO CASA RUTA TEL CEL USD DEL CON POR LOS LAS UNA ANO KMS GSM VAN SUV RAM BYD JAC GMC MODE TIPO PARA TODO CADA SOLO HILUX CRV RAV AMG GLA GLC GLE CLA TDI NRO NUM LOTE CALL ZONA CASI ESQ AVDA".split(" "));
+const TO_DIGIT = {O:"0",Q:"0",D:"0",I:"1",L:"1",S:"5",B:"8",Z:"2",G:"6",T:"7"};
+const TO_LETTER = {"0":"O","1":"I","5":"S","8":"B","2":"Z","6":"G","7":"T"};
+const TEMPLATES = [["Mercosur (car)","LLLLDDD"],["Mercosur (motorcycle)","DDDLLLL"],["Legacy","LLLDDD"]];
+const SEP = "[\\s\\-.·]?", B0 = "(?<![A-Z0-9])", B1 = "(?![A-Z0-9])";
+const PATS = [new RegExp(`${B0}([A-Z]{4})${SEP}(\\d{3})${B1}`,"g"), new RegExp(`${B0}(\\d{3})${SEP}([A-Z]{4})${B1}`,"g"), new RegExp(`${B0}([A-Z]{3})${SEP}(\\d{3})${B1}`,"g")];
+const LOOSE = new RegExp(`${B0}([A-Z0-9]{3,4})${SEP}([A-Z0-9]{3,4})${B1}`,"g");
+
+const norm = s => strip(s).toUpperCase().replace(/[^A-Z0-9]/g, "");
+const split = n => n.match(/[A-Z]+|\d+/g) || [];
+const fmtPlate = n => split(n).join(" ");
+function classify(n){
+  if (/^[A-Z]{4}\d{3}$/.test(n)) return "Mercosur (car)";
+  if (/^\d{3}[A-Z]{4}$/.test(n)) return "Mercosur (motorcycle)";
+  if (/^[A-Z]{3}\d{3}$/.test(n)) return "Legacy";
+  return null;
+}
+function variants(p){
+  const parts = split(norm(p)); if (parts.length < 2) return parts.length ? [parts[0]] : [];
+  return [...new Set([" ","","-"].map(s => parts.join(s)))];
+}
+function coerce(tok){
+  const t = norm(tok); let best = null;
+  for (const [fmt, tpl] of TEMPLATES){
+    if (t.length !== tpl.length) continue;
+    let out = "", fixes = 0, ok = true;
+    for (let i = 0; i < t.length; i++){
+      const ch = t[i], letter = /[A-Z]/.test(ch);
+      if (tpl[i] === "L"){ if (letter) out += ch; else if (TO_LETTER[ch]){ out += TO_LETTER[ch]; fixes++; } else { ok = false; break; } }
+      else { if (!letter) out += ch; else if (TO_DIGIT[ch]){ out += TO_DIGIT[ch]; fixes++; } else { ok = false; break; } }
+    }
+    if (ok && (!best || fixes < best.fixes)) best = {plate: out, fmt, fixes};
+  }
+  return best;
+}
+const canon = n => [...n].map(c => TO_DIGIT[c] || c).join("");
+function lcs(a, b){ const m = Array(b.length + 1).fill(0); for (const ca of a){ let prev = 0; for (let j = 1; j <= b.length; j++){ const tmp = m[j]; m[j] = ca === b[j-1] ? prev + 1 : Math.max(m[j], m[j-1]); prev = tmp; } } return m[b.length]; }
+const ratio = (a, b) => (a.length + b.length) ? 100 * 2 * lcs(a, b) / (a.length + b.length) : 0;
+function findPlates(text){
+  const up = strip(text).toUpperCase(), out = [];
+  for (const rx of PATS){ rx.lastIndex = 0; let m;
+    while ((m = rx.exec(up))){ const letters = /^[A-Z]+$/.test(m[1]) ? m[1] : m[2]; if (STOP.has(letters)) continue; const n = m[1] + m[2]; if (!out.includes(n)) out.push(n); } }
+  return out;
+}
+function matchPlate(target, text){
+  const t = norm(target); if (!t || !text) return {type:"none", score:0, hit:""};
+  const up = strip(text).toUpperCase();
+  const ex = new RegExp(B0 + split(t).map(p => p.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join(SEP) + B1).exec(up);
+  if (ex) return {type:"exact", score:100, hit:ex[0]};
+  let best = 0, hit = "", tc = canon(t); LOOSE.lastIndex = 0; let m;
+  while ((m = LOOSE.exec(up))){
+    const c = m[1] + m[2];
+    if (Math.abs(c.length - t.length) > 1 || /^[A-Z]+$/.test(c) || /^\d+$/.test(c)) continue;
+    const s = canon(c) === tc ? 92 : ratio(c, t);
+    if (s > best){ best = s; hit = m[0]; }
+  }
+  return best >= 83 ? {type:"fuzzy", score:best, hit} : {type:"none", score:0, hit:""};
+}
+
+/* ---------- Entities ---------- */
+const LOCATIONS = ["Asunción","Central","Villarrica","Guairá","Ciudad del Este","Alto Paraná","Encarnación","Itapúa","San Lorenzo","Luque","Capiatá","Lambaré","Fernando de la Mora","Limpio","Ñemby","Mariano Roque Alonso","Itauguá","Villa Elisa","Caaguazú","Coronel Oviedo","Pedro Juan Caballero","Amambay","Concepción","Caacupé","Cordillera","Paraguarí","Pilar","Ñeembucú","Misiones","San Juan Bautista","Caazapá","San Pedro","Canindeyú","Salto del Guairá","Presidente Hayes","Villa Hayes","Boquerón","Filadelfia","Hernandarias","Presidente Franco","Minga Guazú","Areguá","Ypacaraí","Santa Rita","Hohenau","Curuguaty"];
+const MAKES = ["Toyota","Nissan","Hyundai","Kia","Chevrolet","Volkswagen","Ford","Mitsubishi","Honda","Mercedes-Benz","BMW","Audi","Fiat","Renault","Peugeot","Suzuki","Mazda","Isuzu","Subaru","Jeep","Chery","JAC","BYD","Great Wall","Volvo","Daihatsu","Citroën","Lexus","Land Rover","Yamaha","Kenton","Leopard","Taiga"];
+const COLORS = ["blanco","blanca","negro","negra","gris","plata","plateado","rojo","roja","azul","verde","amarillo","naranja","bordo","beige","marrón","dorado"];
+const wordRx = list => new RegExp("(?<![\\p{L}])(" + list.map(w => strip(w).replace(/[-]/g,"[- ]?")).sort((a,b) => b.length - a.length).join("|") + ")(?![\\p{L}])", "giu");
+const LOC_RX = wordRx(LOCATIONS), MAKE_RX = wordRx(MAKES), COLOR_RX = wordRx(COLORS);
+const canonOf = (list, found) => list.find(w => strip(w).toLowerCase().replace(/-/g,"") === strip(found).toLowerCase().replace(/[- ]/g,"")) || found;
+const PHONE_RX = /(?<!\d)(?:\+?595[\s.\-]?|0)9[6-9]\d[\s.\-]?\d{3}[\s.\-]?\d{3}(?!\d)/g;
+const PRICE_RX = /(?:(?:GS\.?|₲|G\$|USD|US\$|U\$S|\$)\s?\d[\d.,]*(?:\s?(?:millones|mill\b|M\b))?|\d(?:[\d.,]*\d)?\s?(?:millones|guaran[ií]es|GS\b|₲|USD\b))/gi;
+const HANDLE_RX = /(?<![\w@.])@([A-Za-z0-9_.]{2,29}[A-Za-z0-9_])/g;
+const uniq = a => [...new Set(a)];
+const normPhone = p => { let d = p.replace(/\D/g,""); if (d.startsWith("595")) d = "0" + d.slice(3); return d; };
+function sellerFromUrl(url){
+  try { const u = new URL(url), h = u.hostname.replace(/^www\./,""), seg = u.pathname.split("/").filter(Boolean);
+    if (/(instagram|tiktok|x|twitter)\.com$/.test(h) && seg[0] && !["p","reel","explore","status","video","search","hashtag"].includes(seg[0])) return "@" + seg[0].replace(/^@/,"");
+  } catch {} return null;
+}
+function entities(text, url){
+  const flat = strip(text);
+  return {
+    phones: uniq((text.match(PHONE_RX) || []).map(normPhone)),
+    prices: uniq((text.match(PRICE_RX) || []).map(s => s.trim().replace(/[.,]$/, ""))),
+    sellers: uniq([...(text.matchAll(HANDLE_RX))].map(m => "@" + m[1]).concat(sellerFromUrl(url) || [])),
+    locations: uniq([...flat.matchAll(LOC_RX)].map(m => canonOf(LOCATIONS, m[1]))),
+    makes: uniq([...flat.matchAll(MAKE_RX)].map(m => canonOf(MAKES, m[1]))),
+    colors: uniq([...flat.matchAll(COLOR_RX)].map(m => m[1].toLowerCase())),
+    plates: findPlates(text),
+  };
+}
+const MONTHS = {jan:1,ene:1,feb:2,mar:3,apr:4,abr:4,may:5,jun:6,jul:7,aug:8,ago:8,sep:9,set:9,oct:10,nov:11,dec:12,dic:12};
+function extractDate(text, added){
+  const f = strip(text).toLowerCase(); let m;
+  const mk = (y, mo, d) => { const dt = new Date(Date.UTC(y, mo - 1, d)); return (y > 1990 && dt.getUTCMonth() === mo - 1 && dt <= new Date(Date.now() + 864e5)) ? dt.toISOString().slice(0,10) : null; };
+  if ((m = f.match(/hace\s+(\d+)\s+(minuto|hora|dia|semana|mes|ano)/))){ const mult = {minuto:0,hora:0,dia:1,semana:7,mes:30,ano:365}[m[2]]; return new Date(added - m[1] * mult * 864e5).toISOString().slice(0,10); }
+  if ((m = f.match(/(\d{4})-(\d{2})-(\d{2})/))) { const r = mk(+m[1], +m[2], +m[3]); if (r) return r; }
+  if ((m = f.match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/))) { const r = mk(+m[3], +m[2], +m[1]); if (r) return r; }
+  if ((m = f.match(/(\d{1,2})\s+(?:de\s+)?([a-z]{3})[a-z]*\.?\s+(?:de\s+)?(\d{4})/)) && MONTHS[m[2]]) { const r = mk(+m[3], MONTHS[m[2]], +m[1]); if (r) return r; }
+  if ((m = f.match(/([a-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/)) && MONTHS[m[1]]) { const r = mk(+m[3], MONTHS[m[1]], +m[2]); if (r) return r; }
+  return null;
+}
+function platformOf(url){
+  const u = url.toLowerCase();
+  if (/facebook\.com\/(marketplace|groups)/.test(u)) return "Marketplace";
+  if (/clasipar|hendyla|tuautopy|autos?\.com\.py|clasificados/.test(u)) return "Classifieds";
+  if (/instagram\.com|tiktok\.com|(^|\/\/|\.)x\.com|twitter\.com|facebook\.com|\/social\//.test(u)) return "Social Post";
+  if (/abc\.com\.py|ultimahora|lanacion\.com\.py|hoy\.com\.py|npy\.com\.py|extra\.com\.py|unicanal|noticias/.test(u)) return "News";
+  if (/marketplace/.test(u)) return "Marketplace";
+  return "Web";
+}
+
+/* ---------- Queries ---------- */
+const SITES = { Marketplace:["facebook.com/marketplace","facebook.com/groups"], Classifieds:["clasipar.paraguay.com","hendyla.com"], "Social Post":["instagram.com","tiktok.com","x.com"] };
+const KEYWORDS = '("chapa" OR "venta" OR "transferir" OR "contrato privado" OR "auto")';
+const sites = l => "(" + l.map(s => "site:" + s).join(" OR ") + ")";
+const gurl = q => "https://www.google.com/search?q=" + encodeURIComponent(q);
+function params(){ return {plate:$("#plate").value, make:$("#make").value.trim(), model:$("#model").value.trim(), year:$("#year").value.trim(), color:$("#color").value.trim(), loc:$("#loc").value.trim()}; }
+function buildQueries(p){
+  const v = variants(p.plate), pt = v.length ? "(" + v.map(x => `"${x}"`).join(" OR ") + ")" : "";
+  const veh = [p.make, p.model].filter(Boolean).join(" "), vt = veh ? `"${veh}"` : "";
+  const lq = p.loc ? `"${p.loc}"` : "", extras = [p.year, p.color, lq].filter(Boolean).join(" ");
+  const out = [], add = (label, plat, ...parts) => { const q = parts.filter(Boolean).join(" ").trim(); if (q && !out.some(o => o.q === q)) out.push({label, plat, q}); };
+  if (pt){
+    add("Plate · whole web", "Web", pt);
+    add("Plate · Marketplace & groups", "Marketplace", pt, sites(SITES.Marketplace));
+    add("Plate · classifieds", "Classifieds", pt, sites(SITES.Classifieds));
+    add("Plate · social posts", "Social Post", pt, sites(SITES["Social Post"]));
+    add("Plate · sale / transfer words", "Web", pt, KEYWORDS);
+    if (vt || lq) add("Plate · with vehicle details", "Web", pt, vt, lq);
+    add("Plate · photos (Google Images)", "Images", pt);
+  }
+  if (vt){
+    add("Vehicle · classifieds", "Classifieds", vt, extras, sites(SITES.Classifieds));
+    add("Vehicle · Marketplace & groups", "Marketplace", vt, extras, sites(SITES.Marketplace));
+    add("Vehicle · sale / transfer words", "Web", vt, extras, KEYWORDS);
+    add("Vehicle · social posts", "Social Post", vt, extras, sites(SITES["Social Post"]));
+  } else if (!pt && lq) add("Location · vehicle sales", "Web", lq, KEYWORDS);
+  return out.map(o => ({...o, url: o.plat === "Images" ? gurl(o.q) + "&tbm=isch" : gurl(o.q)}));
+}
+let queries = [];
+function renderQueries(){
+  const p = params(), n = norm(p.plate), c = classify(n);
+  $("#fmt").innerHTML = n ? (c ? `<b>${esc(fmtPlate(n))}</b> · ${c} format` : `<b>${esc(n)}</b> · not a standard format, searched as typed`) : "Leave empty to search by vehicle only";
+  queries = buildQueries(p);
+  $("#cQ").textContent = queries.length;
+  $("#queries").innerHTML = queries.length ? queries.map(q => `<div class="q"><div style="min-width:0"><div class="lbl">${esc(q.label)}</div><code>${esc(q.q)}</code></div><a class="btn" href="${esc(q.url)}" target="_blank" rel="noopener">Open in Google ↗</a></div>`).join("")
+    : `<p class="empty">Enter a plate, a make/model, or a city.</p>`;
+}
+
+/* ---------- Results store ---------- */
+const KEY = "chapa-finder-v1";
+let results = [];
+try { results = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { results = []; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(results)); } catch {} };
+const IMG_RX = /\.(jpe?g|png|webp|gif)(\?|$)|fbcdn\.net|cdninstagram\.com|googleusercontent\.com\/.*=/i;
+function parsePasted(text){
+  return text.trim().split(/\n\s*\n/).map(b => b.trim()).filter(Boolean).map(block => {
+    const urls = block.match(/https?:\/\/[^\s<>"')]+/g) || [];
+    const imgs = urls.filter(u => IMG_RX.test(u)), pages = urls.filter(u => !IMG_RX.test(u));
+    const lines = block.replace(/https?:\/\/[^\s<>"')]+/g, "").split("\n").map(s => s.trim()).filter(Boolean);
+    const url = (pages[0] || "").replace(/[.,]$/, "");
+    return {url, image: imgs[0] || "", title: (lines[0] || url || "Untitled").slice(0, 200), snippet: (lines.slice(1).join(" ") || lines[0] || "").slice(0, 1200)};
+  });
+}
+function analyze(hit, p, source){
+  const text = hit.title + " " + hit.snippet, added = hit.added || Date.now();
+  const m = matchPlate(p.plate, text), e = entities(text, hit.url), flat = strip(text).toLowerCase();
+  const has = s => s && flat.includes(strip(s).toLowerCase());
+  let type = m.type, conf = m.type === "exact" ? 1 : m.type === "fuzzy" ? +(m.score / 100 * 0.9).toFixed(2) : 0;
+  const vehHit = (p.make || p.model) && (!p.make || has(p.make)) && (!p.model || has(p.model));
+  if (type === "none" && vehHit){ type = "vehicle"; conf = 0.35 + (has(p.loc) ? .1 : 0) + (has(p.year) ? .1 : 0) + (has(p.color) ? .1 : 0); }
+  else if (type !== "none") conf = Math.min(1, conf + (vehHit ? .02 : 0));
+  return {...hit, id: hit.id || Math.random().toString(36).slice(2, 10), added, source, target: norm(p.plate),
+    platform: hit.platform || (hit.url ? platformOf(hit.url) : "Web"), match: type, hitText: m.hit, conf: +conf.toFixed(2), ent: e, date: extractDate(text, added)};
+}
+function addHits(hits, source){
+  const p = params(); let added = 0, dup = 0;
+  for (const h of hits){
+    const key = h.url || (h.title + h.snippet);
+    if (results.some(r => (r.url || (r.title + r.snippet)) === key)){ dup++; continue; }
+    results.push(analyze(h, p, source)); added++;
+  }
+  save(); renderAll();
+  toast(`${added} added` + (dup ? `, ${dup} already in the list` : ""));
+}
+function reanalyze(){ const p = params(); results = results.map(r => analyze(r, p, r.source)); save(); }
+
+/* ---------- Results view ---------- */
+function highlight(text, r){
+  let h = esc(text);
+  if (r.hitText){ const rx = new RegExp(r.hitText.split("").map(c => /[A-Z0-9]/.test(c) ? c : ".").join(""), "gi"); h = h.replace(rx, s => `<mark class="${r.match === "exact" ? "x" : ""}">${s}</mark>`); }
+  return h;
+}
+const MATCH_LABEL = {exact:"exact", fuzzy:"fuzzy", vehicle:"vehicle", none:"no match"};
+function filtered(){
+  const plat = $("#fPlat").value, mt = $("#fMatch").value, min = +$("#fConf").value / 100, q = strip($("#fText").value).toLowerCase().trim();
+  return results.filter(r => (!plat || r.platform === plat) && (!mt || r.match === mt) && r.conf >= min &&
+    (!q || strip(r.title + " " + r.snippet + " " + r.url + " " + r.ent.locations.join(" ") + " " + r.ent.phones.join(" ")).toLowerCase().includes(q)))
+    .sort((a, b) => b.conf - a.conf || (b.date || "").localeCompare(a.date || ""));
+}
+function lensLink(r){
+  if (r.image) return `<a class="tag p" href="https://lens.google.com/uploadbyurl?url=${encodeURIComponent(r.image)}" target="_blank" rel="noopener">Google Lens ↗</a>`;
+  const pl = r.ent.plates[0] || r.target;
+  return pl ? `<a class="tag" href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent('"' + fmtPlate(pl) + '"')}" target="_blank" rel="noopener">Image search ↗</a>` : "";
+}
+function renderResults(){
+  const plats = uniq(results.map(r => r.platform)).sort(), sel = $("#fPlat"), cur = sel.value;
+  sel.innerHTML = `<option value="">All sources</option>` + plats.map(p => `<option${p === cur ? " selected" : ""}>${esc(p)}</option>`).join("");
+  $("#cR").textContent = results.length;
+  const rows = filtered();
+  $("#results").innerHTML = rows.length ? rows.map(r => `
+    <article class="res">
+      <div class="conf m-${r.match}">${Math.round(r.conf * 100)}<small>${MATCH_LABEL[r.match]}</small></div>
+      <div style="min-width:0">
+        <div class="t">${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${highlight(r.title, r)}</a>` : highlight(r.title, r)}</div>
+        ${r.url ? `<div class="u">${esc(r.url)}</div>` : ""}
+        <p class="s">${highlight(r.snippet, r)}</p>
+        <div class="tags">
+          <span class="tag p">${esc(r.platform)}</span>
+          ${r.date ? `<span class="tag">${r.date}</span>` : ""}
+          ${r.ent.plates.map(p => `<span class="tag">${esc(fmtPlate(p))}</span>`).join("")}
+          ${r.ent.phones.map(p => `<span class="tag">☎ ${esc(p)}</span>`).join("")}
+          ${r.ent.prices.map(p => `<span class="tag">${esc(p)}</span>`).join("")}
+          ${r.ent.locations.map(p => `<span class="tag">${esc(p)}</span>`).join("")}
+          ${r.ent.sellers.map(p => `<span class="tag">${esc(p)}</span>`).join("")}
+          ${r.source === "example" ? `<span class="tag">example</span>` : ""}
+          ${lensLink(r)}
+        </div>
+      </div>
+    </article>`).join("") : `<p class="empty">${results.length ? "No results match these filters." : "No results yet. Open a search, then paste what you find under Add findings."}</p>`;
+}
+function renderAnalytics(){
+  const by = t => results.filter(r => r.match === t).length;
+  $("#stats").innerHTML = [["Results", results.length], ["Exact plate", by("exact")], ["Fuzzy plate", by("fuzzy")], ["Vehicle only", by("vehicle")]]
+    .map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
+  const tally = key => { const m = new Map(); results.forEach(r => (r.ent[key] || []).forEach(v => m.set(v, (m.get(v) || 0) + 1))); return [...m].sort((a, b) => b[1] - a[1]).slice(0, 12); };
+  const block = (title, key, f = x => x) => { const t = tally(key); return `<div class="ent"><h3>${title}</h3>${t.length ? `<ol>${t.map(([v, n]) => `<li class="${n > 1 ? "rep" : ""}"><span>${esc(f(v))}</span><span class="n">${n}×</span></li>`).join("")}</ol>` : `<p class="empty">None found</p>`}</div>`; };
+  $("#ents").innerHTML = block("Plates mentioned", "plates", fmtPlate) + block("Phone numbers", "phones") + block("Sellers / accounts", "sellers") + block("Places", "locations") + block("Prices", "prices") + block("Makes", "makes");
+}
+function renderTimeline(){
+  const rows = [...results].sort((a, b) => (a.date || new Date(a.added).toISOString()).localeCompare(b.date || new Date(b.added).toISOString()));
+  $("#tl").innerHTML = rows.length ? rows.map(r => `<li class="${r.match}"><div class="d">${r.date || "undated · added " + new Date(r.added).toISOString().slice(0, 10)} · ${esc(r.platform)} · ${MATCH_LABEL[r.match]}</div>
+    <div>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : esc(r.title)}</div>
+    <div class="hint" style="margin:0">${[...r.ent.locations, ...r.ent.prices, ...r.ent.phones].map(esc).join(" · ")}</div></li>`).join("") : `<p class="empty">Nothing yet.</p>`;
+}
+function renderAll(){ renderResults(); renderAnalytics(); renderTimeline(); }
+
+/* ---------- Export ---------- */
+function table(sep){
+  const cell = v => { v = String(v ?? ""); return sep === "," ? (/[",\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v) : v.replace(/[\t\n]/g, " "); };
+  const head = ["Confidence","Match","Source","Date","Title","URL","Plates","Phones","Prices","Places","Sellers","Snippet"];
+  return [head, ...filtered().map(r => [r.conf, r.match, r.platform, r.date || "", r.title, r.url, r.ent.plates.map(fmtPlate).join("; "), r.ent.phones.join("; "), r.ent.prices.join("; "), r.ent.locations.join("; "), r.ent.sellers.join("; "), r.snippet])]
+    .map(row => row.map(cell).join(sep)).join("\n");
+}
+async function copy(text, msg){
+  try { await navigator.clipboard.writeText(text); toast(msg); }
+  catch { const ta = $("#pasteIn"); switchTab("paste"); ta.value = text; ta.select(); toast("Copy blocked: text is selected in the box, press Ctrl+C"); }
+}
+
+/* ---------- UI wiring ---------- */
+let tt; function toast(m){ const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
+function switchTab(name){
+  $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  $$("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== name);
+  try { localStorage.setItem(KEY + "-tab", name); } catch {}
+}
+$$(".tabs button").forEach(b => b.addEventListener("click", () => { switchTab(b.dataset.tab); if (matchMedia("(max-width:640px)").matches) $("main").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion:reduce)").matches ? "auto" : "smooth", block: "start"}); }));
+$("#locs").innerHTML = LOCATIONS.map(l => `<option value="${esc(l)}">`).join("");
+["plate","make","model","year","color","loc"].forEach(id => $("#" + id).addEventListener("input", () => { renderQueries(); }));
+["plate","make","model","year","color","loc"].forEach(id => $("#" + id).addEventListener("change", () => { reanalyze(); renderAll(); }));
+$("#go").addEventListener("click", () => { renderQueries(); reanalyze(); renderAll(); switchTab("queries"); });
+$("#openAll").addEventListener("click", () => queries.forEach(q => { const a = document.createElement("a"); a.href = q.url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }));
+$("#addBtn").addEventListener("click", () => {
+  const hits = parsePasted($("#pasteIn").value);
+  if (!hits.length) return toast("Paste the text and link of at least one listing first");
+  addHits(hits, "pasted"); $("#pasteIn").value = ""; switchTab("results");
+});
+$("#demoBtn").addEventListener("click", () => { addHits(DEMO.map((d, i) => ({...d, added: Date.now() - (DEMO.length - i) * 1000})), "example"); switchTab("results"); });
+$("#clearBtn").addEventListener("click", () => { if (!results.length) return toast("Nothing to clear"); $("#clearN").textContent = results.length; $("#clearConfirm").hidden = false; });
+$("#clearNo").addEventListener("click", () => $("#clearConfirm").hidden = true);
+$("#clearYes").addEventListener("click", () => { results = []; save(); renderAll(); $("#clearConfirm").hidden = true; toast("Cleared"); });
+["fPlat","fMatch","fText"].forEach(id => $("#" + id).addEventListener("input", renderResults));
+$("#fConf").addEventListener("input", e => { $("#fConfV").textContent = e.target.value + "%"; renderResults(); });
+$("#copySheet").addEventListener("click", () => copy(table("\t"), "Copied. Paste into cell A1 of a Google Sheet"));
+$("#copyCsv").addEventListener("click", () => copy(table(","), "CSV copied"));
+$("#ocrIn").addEventListener("input", e => {
+  const raw = e.target.value, out = $("#ocrOut");
+  if (!norm(raw)) { out.textContent = "Type what you or an OCR app read from the image."; return; }
+  const c = coerce(raw), target = norm($("#plate").value);
+  if (!c) { out.innerHTML = `<b>${esc(norm(raw))}</b> does not fit a Paraguayan plate format (ABCD 123, 123 ABCD, ABC 123).`; return; }
+  const same = target && canon(c.plate) === canon(target), r = target ? Math.round(ratio(c.plate, target)) : 0;
+  out.innerHTML = `Reads as <b>${esc(fmtPlate(c.plate))}</b> · ${c.fmt}${c.fixes ? ` · ${c.fixes} character${c.fixes > 1 ? "s" : ""} corrected` : ""}` +
+    (target ? `<br>${c.plate === target ? `<span style="color:var(--exact)">Exact match with ${esc(fmtPlate(target))}</span>` : same ? `<span style="color:var(--fuzzy)">Same as ${esc(fmtPlate(target))} apart from look-alike characters</span>` : `${r}% similar to ${esc(fmtPlate(target))}`}` : "");
+});
+
+const DEMO = [
+  {url:"https://example.com/marketplace/item/1001", title:"Toyota Hilux 2015 4x4 - Villarrica", snippet:"Vendo Toyota Hilux 2015 color blanco, chapa ABCD 123, papeles al día, listo para transferir. Gs. 145.000.000. Llamar al 0981 555 010. Villarrica, Guairá. 12 mar 2025", platform:"Marketplace"},
+  {url:"https://example.com/clasificados/hilux-2015", title:"Hilux SRV 2015 blanca impecable", snippet:"Toyota Hilux 2015, chapa ABCD-123, 98.000 km. USD 21.500. Contacto 0981 555 010 o @autos_demo_py. Villarrica. 2 abr 2025", platform:"Classifieds"},
+  {url:"https://example.com/social/autos_demo_py/post/77", title:"@autos_demo_py: Hilux blanca disponible", snippet:"Disponible Hilux 2015, chapa ABCD 1Z3 (foto), financiación. Consultas al 0981-555-010. Coronel Oviedo. 20 abr 2025", platform:"Social Post", image:"https://example.com/img/hilux-front.jpg"},
+  {url:"https://example.com/noticias/vehiculo-recuperado", title:"Recuperan camioneta denunciada como robada", snippet:"Agentes verificaron una Toyota Hilux con chapa ABCO 123 en Asunción; el número de chasis no coincidía. 15 may 2025", platform:"News"},
+  {url:"https://example.com/social/p/xyz", title:"Nueva oferta de la semana", snippet:"Hilux 2015 blanca full equipo, financiación propia. Consultas 0981 555 010. Asunción, Central. 28 may 2025", platform:"Social Post"},
+  {url:"https://example.com/clasificados/corolla-2012", title:"Toyota Corolla 2012 gris", snippet:"Corolla 2012 gris, chapa WXYZ 456, Gs. 62.000.000. Tel 0961 555 030. Encarnación, Itapúa. 3 jun 2025", platform:"Classifieds"},
+];
+
+renderQueries();
+if (!results.length) { results = DEMO.map((d, i) => analyze({...d, added: Date.now() - (DEMO.length - i) * 1000}, params(), "example")); }
+renderAll();
+let tab = "queries"; try { tab = localStorage.getItem(KEY + "-tab") || "queries"; } catch {}
+switchTab(tab);
+})();
+</script>
